@@ -4,8 +4,7 @@ Modbusino
 Introduction
 ------------
 
-Modbusino is a ISC licensed library to handle Modbus requests on Arduino
-(slave).
+Arduino Simple Modbus Slave is a ISC licensed library to handle Modbus requests on Arduino (slave).
 
 
 Features
@@ -49,7 +48,7 @@ Contribute
 I want to keep this library very basic and small so if you want to contribute:
 
 1. Check for open issues or open a fresh issue to start a discussion around a feature idea or a bug.
-2. Fork the [repository](https://github.com/stephane/modbusino/) on Github to start making your changes on another
+2. Fork the [repository](https://github.com/kolod/Arduino-Simple-Modbus-Slave/) on Github to start making your changes on another
    branch.
 3. Send a pull request (of your small and atomic changes).
 4. Bug the maintainer if he's too busy to answer :)
