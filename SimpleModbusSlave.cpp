@@ -64,19 +64,14 @@ void SimpleModbusSlave::setup(long baud) {
 	Serial.begin(baud);
 }
 
+// Check CRC of msg
 static int check_integrity(uint8_t *msg, uint8_t msg_length)
 {
-	uint16_t crc_calculated;
-	uint16_t crc_received;
-
-	if (msg_length < 2)
-	return -1;
-
-	crc_calculated = crc16(msg, msg_length - 2);
-	crc_received = (msg[msg_length - 2] << 8) | msg[msg_length - 1];
-
-	/* Check CRC of msg */
-	return (crc_calculated == crc_received) ? msg_length : -1;
+	if ((msg_length >= 2) && crc16(msg, msg_length)) {
+		return msg_length;
+	} else {
+		return -1;
+	}
 }
 
 static int build_response_basis(uint8_t slave, uint8_t function,
