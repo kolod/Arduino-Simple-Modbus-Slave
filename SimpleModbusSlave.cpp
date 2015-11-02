@@ -17,7 +17,9 @@
   #include "WProgram.h"
   #include <pins_arduino.h>
 #endif
+
 #include "SimpleModbusSlave.h"
+#include "crc16.h"
 
 #define _MODBUS_RTU_SLAVE                0
 #define _MODBUS_RTU_FUNCTION             1
@@ -37,22 +39,6 @@ enum {
 	_STEP_META,
 	_STEP_DATA
 };
-
-static uint16_t crc16(uint8_t *req, uint8_t req_length)
-{
-	uint8_t j;
-	uint16_t crc = 0xFFFF;
-	while (req_length--) {
-	crc = crc ^ *req++;
-	for (j=0; j < 8; j++) {
-		if (crc & 0x0001)
-			crc = (crc >> 1) ^ 0xA001;
-		else
-			crc = crc >> 1;
-		}
-	}
-	return (crc << 8  | crc >> 8);
-}
 
 SimpleModbusSlave::SimpleModbusSlave(uint8_t slave) {
 	if (slave >= 0 & slave <= 247) {
@@ -74,8 +60,7 @@ static int check_integrity(uint8_t *msg, uint8_t msg_length)
 	}
 }
 
-static int build_response_basis(uint8_t slave, uint8_t function,
-				uint8_t* rsp)
+static int build_response_basis(uint8_t slave, uint8_t function, uint8_t* rsp)
 {
 	rsp[0] = slave;
 	rsp[1] = function;
@@ -210,6 +195,7 @@ static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_
 	uint16_t nb       = (req[_MODBUS_RTU_FUNCTION + 3] << 8) + req[_MODBUS_RTU_FUNCTION + 4];
 	uint8_t  rsp[_MODBUSINO_RTU_MAX_ADU_LENGTH];
 	uint8_t  rsp_length = 0;
+	uint16_t i, j;
 
 	if (slave != _slave && slave != MODBUS_BROADCAST_ADDRESS) {
 		return;
@@ -221,8 +207,6 @@ static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_
 		req_length -= _MODBUS_RTU_CHECKSUM_LENGTH;
 
 		if (function == _FC_READ_HOLDING_REGISTERS) {
-			uint16_t i;
-
 			rsp_length = build_response_basis(slave, function, rsp);
 			rsp[rsp_length++] = nb << 1;
 			for (i = address; i < address + nb; i++) {
@@ -230,7 +214,6 @@ static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_
 				rsp[rsp_length++] = tab_reg[i] & 0xFF;
 			}
 		} else {
-			uint16_t i, j;
 
 			for (i = address, j = 6; i < address + nb; i++, j += 2) {
 				/* 6 and 7 = first value */
