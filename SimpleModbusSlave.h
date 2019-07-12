@@ -20,6 +20,8 @@
   #include <pins_arduino.h>
 #endif
 
+#include "crc16.h"
+
 #define MODBUS_BROADCAST_ADDRESS 0
 
 /* Protocol exceptions */

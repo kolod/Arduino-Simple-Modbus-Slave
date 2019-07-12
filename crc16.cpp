@@ -10,14 +10,17 @@
 
 #include "crc16.h"
 
+#define LOBYTE(x) (*((uint8_t*)&(x)))
+#define HIBYTE(x) (*((uint8_t*)&(x)+1))
+
 #if defined(__AVR__)
-  #include <avr/pgmspace.h>
+#include <avr/pgmspace.h>
 #else
-  #define PROGMEM
-  #define pgm_read_word_near(x) x
+#define PROGMEM
+#define pgm_read_word_near(x) (*((uint16_t*)x))
 #endif
 
-const PROGMEM uint16_t CRCTable[] = {
+const uint16_t CRCTable[] PROGMEM = {
 	0x0000, 0xC0C1, 0xC181, 0x0140, 0xC301, 0x03C0, 0x0280, 0xC241,
 	0xC601, 0x06C0, 0x0780, 0xC741, 0x0500, 0xC5C1, 0xC481, 0x0440,
 	0xCC01, 0x0CC0, 0x0D80, 0xCD41, 0x0F00, 0xCFC1, 0xCE81, 0x0E40,
@@ -56,9 +59,16 @@ uint16_t crc16(uint8_t *data, uint8_t length) {
 	uint16_t crc = 0xFFFF;
 
 	while (length--) {
-		uint8_t temp = *(data++) ^ crc;
-		crc = (crc >> 8) ^ pgm_read_word_near(CRCTable[temp]);
+		uint8_t temp = *(data++) ^ LOBYTE(crc);
+		crc = (crc >> 8) ^ pgm_read_word_near(CRCTable + temp);
 	}
 
 	return crc;
+}
+
+void add_crc16(uint8_t *data, uint8_t length) {
+	uint16_t crc = crc16(data, length);
+
+	data[length++] = LOBYTE(crc);
+	data[length++] = HIBYTE(crc);
 }

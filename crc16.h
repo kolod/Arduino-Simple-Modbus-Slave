@@ -15,5 +15,6 @@
 #include <stdint.h>
 
 extern uint16_t crc16(uint8_t *data, uint8_t length);
+extern void add_crc16(uint8_t *data, uint8_t length);
 
 #endif /* CRC16_h */
