@@ -28,7 +28,9 @@
 
 #define _MODBUS_RTU_CHECKSUM_LENGTH      2
 
-#define _MODBUSINO_RTU_MAX_ADU_LENGTH  128
+/* As reported in https://github.com/stephane/modbusino/issues/6, the code could
+segfault for longer ADU */
+#define _MODBUSINO_RTU_MAX_ADU_LENGTH 256
 
 /* Supported function codes */
 #define _FC_READ_HOLDING_REGISTERS    0x03
@@ -84,6 +86,7 @@ static uint8_t response_exception(uint8_t slave, uint8_t function, uint8_t excep
 
 	/* Positive exception code */
 	rsp[rsp_length++] = exception_code;
+
 	return rsp_length;
 }
 
@@ -122,10 +125,11 @@ static int receive(uint8_t *req, uint8_t _slave)
 		if (!Serial.available()) {
 	 		i = 0;
 				while (!Serial.available()) {
-				delay(1);
 				if (++i == 10) {
-					return -1; /* Too late, bye */
+                    /* Too late, bye */
+                    return -1 - MODBUS_INFORMATIVE_RX_TIMEOUT;
 				}
+                delay(1);
 		 	}
 		}
 
@@ -138,8 +142,13 @@ static int receive(uint8_t *req, uint8_t _slave)
 		length_to_read--;
 
 		if (length_to_read == 0) {
-			switch (step) {
+            if (req[_MODBUS_RTU_SLAVE] != _slave
+                && req[_MODBUS_RTU_SLAVE != MODBUS_BROADCAST_ADDRESS]) {
+                flush();
+                return -1 - MODBUS_INFORMATIVE_NOT_FOR_US;
+            }
 
+			switch (step) {
 			case _STEP_FUNCTION:
 				/* Function code position */
 				function = req[_MODBUS_RTU_FUNCTION];
@@ -156,12 +165,11 @@ static int receive(uint8_t *req, uint8_t _slave)
 						send_msg(req, rsp_length);
 						return - 1 - MODBUS_EXCEPTION_ILLEGAL_FUNCTION;
 					}
+
 					return -1;
 				}
-
 				step = _STEP_META;
 				break;
-
 			case _STEP_META:
 				length_to_read = _MODBUS_RTU_CHECKSUM_LENGTH;
 
@@ -195,7 +203,6 @@ static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_
 	uint16_t nb       = (req[_MODBUS_RTU_FUNCTION + 3] << 8) + req[_MODBUS_RTU_FUNCTION + 4];
 	uint8_t  rsp[_MODBUSINO_RTU_MAX_ADU_LENGTH];
 	uint8_t  rsp_length = 0;
-	uint16_t i, j;
 
 	if (slave != _slave && slave != MODBUS_BROADCAST_ADDRESS) {
 		return;
@@ -207,6 +214,8 @@ static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_
 		req_length -= _MODBUS_RTU_CHECKSUM_LENGTH;
 
 		if (function == _FC_READ_HOLDING_REGISTERS) {
+            uint16_t i;
+
 			rsp_length = build_response_basis(slave, function, rsp);
 			rsp[rsp_length++] = nb << 1;
 			for (i = address; i < address + nb; i++) {
@@ -214,11 +223,12 @@ static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_
 				rsp[rsp_length++] = tab_reg[i] & 0xFF;
 			}
 		} else {
+            uint16_t i, j;
 
 			for (i = address, j = 6; i < address + nb; i++, j += 2) {
 				/* 6 and 7 = first value */
-				tab_reg[i] = (req[_MODBUS_RTU_FUNCTION + j] << 8) +
-					req[_MODBUS_RTU_FUNCTION + j + 1];
+                tab_reg[i] = (req[_MODBUS_RTU_FUNCTION + j] << 8)
+                             + req[_MODBUS_RTU_FUNCTION + j + 1];
 			}
 
 			rsp_length = build_response_basis(slave, function, rsp);
