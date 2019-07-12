@@ -4,7 +4,7 @@ Simple Modbus Slave
 Introduction
 ------------
 
-Arduino Simple Modbus Slave is a ISC licensed library to handle Modbus requests on Arduino (slave).
+Arduino Simple Modbus Slave is an ISC licensed library to handle Modbus requests on Arduino (slave).
 
 
 Features
