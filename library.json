@@ -3,11 +3,29 @@
 	"keywords": "protocol, message, communication, serial, modbus",
 	"description": "Arduino Simple Modbus Slave is a ISC licensed library to handle Modbus requests on Arduino (slave).",
 	"authors": [
-		{"name": "Stéphane Raimbault", "url": "https://github.com/stephane"},
-		{"name": "Alexandr Kolodkin",  "url": "https://github.com/kolod"}
+		{
+			"name": "Stéphane Raimbault", 
+			"url": "https://github.com/stephane", 
+			"email": "stephane.raimbault@gmail.com"
+		},
+		{
+			"name": "Alexandr Kolodkin",  
+			"url": "https://github.com/kolod", 
+			"email": "alexandr.kolodkin@gmail.com",
+        	"maintainer": true
+        }
 	],
-	"repository": {"type": "git", "url": "https://github.com/thijse/Arduino-CmdMessenger.git"},
-	"frameworks": "arduino"
+	"repository": {
+		"type": "git", 
+		"url": "https://github.com/kolod/Arduino-Simple-Modbus-Slave.git"
+	},
+	"version": "1.0.0",
+	"license": "ISC",
+	"frameworks": "arduino",
+	"platforms": "*",
+	"examples": [
+		"[Ee]xamples/*/*.ino"
+	]
 }
 
 
