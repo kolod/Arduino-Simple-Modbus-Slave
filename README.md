@@ -38,7 +38,7 @@ void loop() {
     /* Launch Modbus slave loop with:
        - pointer to the mapping
        - max values of mapping */
-    slave.loop(tab_reg, 10);
+    slave.loop(regs, 10);
 }
 ```
 
