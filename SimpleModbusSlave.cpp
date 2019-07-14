@@ -112,10 +112,7 @@ static int receive(uint8_t *req, uint8_t _slave) {
 		if (!Serial.available()) {
 			i = 0;
 			while (!Serial.available()) {
-			if (++i == 10) {
-				/* Too late, bye */
-				return -1 - MODBUS_INFORMATIVE_RX_TIMEOUT;
-			}
+				if (++i == 10) return -1 - MODBUS_INFORMATIVE_RX_TIMEOUT; // Too late, bye
 				delay(1);
 			}
 		}
@@ -193,7 +190,7 @@ static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_
 
 	if (slave != _slave && slave != MODBUS_BROADCAST_ADDRESS) return;
 
-	if (address + nb > nb_reg) {
+	if ((address + nb) > nb_reg) {
 		rsp_length = response_exception(slave, function, MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS, rsp);
 	} else {
 		req_length -= _MODBUS_RTU_CHECKSUM_LENGTH;
@@ -240,6 +237,10 @@ int SimpleModbusSlave::loop(uint16_t* tab_reg, uint16_t nb_reg) {
 	//  0 if a slave filtering has occured,
 	// -1 if an undefined error has occured,
 	// -2 for MODBUS_EXCEPTION_ILLEGAL_FUNCTION
-	// etc
+	// -3 for MODBUS_EXCEPTION_ILLEGAL_FUNCTION
+	// -4 for MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS
+	// -5 for MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE
+	// -6 for MODBUS_INFORMATIVE_NOT_FOR_US
+	// -7 for MODBUS_INFORMATIVE_RX_TIMEOUT
 	return rc;
 }
