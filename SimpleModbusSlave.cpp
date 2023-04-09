@@ -41,7 +41,7 @@ enum {
 };
 
 SimpleModbusSlave::SimpleModbusSlave(uint8_t slave) {
-	if (slave >= 0 & slave <= 247) {
+	if ((slave >= 0) & (slave <= 247)) {
 		_slave = slave;
 	}
 }
