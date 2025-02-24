@@ -1,5 +1,6 @@
 /*
- * Copyright © 2015 Alexandr Kolodkin <alexandr.kolodkin@gmail.com>
+ * Copyright © 2011-2012 Stéphane Raimbault <stephane.raimbault@gmail.com>
+ * Copyright © 2015-... Oleksandr Kolodkin <oleksandr.kolodkin@ukr.net>
  *
  * License ISC, see LICENSE for more details.
  *

@@ -1,6 +1,6 @@
 /*
  * Copyright © 2011-2012 Stéphane Raimbault <stephane.raimbault@gmail.com>
- * Copyright © 2015 Alexandr Kolodkin <alexandr.kolodkin@gmail.com>
+ * Copyright © 2015-... Oleksandr Kolodkin <oleksandr.kolodkin@ukr.net>
  *
  * License ISC, see LICENSE for more details.
  *
@@ -13,13 +13,7 @@
 #define SimpleModbusSlave_h
 
 #include <inttypes.h>
-#if defined(ARDUINO) && ARDUINO >= 100
-  #include "Arduino.h"
-#else
-  #include "WProgram.h"
-  #include <pins_arduino.h>
-#endif
-
+#include <Arduino.h>
 #include "crc16.h"
 
 #define MODBUS_BROADCAST_ADDRESS 0

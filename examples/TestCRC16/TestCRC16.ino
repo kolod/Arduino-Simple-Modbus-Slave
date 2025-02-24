@@ -1,5 +1,5 @@
 //    Arduino PPM Generator
-//    Copyright (C) 2015-2019  Alexandr Kolodkin <alexandr.kolodkin@gmail.com>
+//    Copyright (C) 2015-...  Oleksandr Kolodkin <oleksandr.kolodkin@ukr.net>
 //
 //    This program is free software: you can redistribute it and/or modify
 //    it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@ bool test(uint8_t *data, uint8_t length) {
 }
 
 int setup() {
-  Serial.begin(115200);
+  	Serial.begin(115200);
   
 	if (test(msg, sizeof(msg))) {
 		Serial.print("CRC16 Ok!\n");
@@ -37,5 +37,5 @@ int setup() {
 }
 
 void loop() {
-  ;
+  	;
 }

@@ -9,9 +9,9 @@
 			"email": "stephane.raimbault@gmail.com"
 		},
 		{
-			"name": "Alexandr Kolodkin",  
+			"name": "Oleksandr Kolodkin",  
 			"url": "https://github.com/kolod", 
-			"email": "alexandr.kolodkin@gmail.com",
+			"email": "<oleksandr.kolodkin@ukr.net",
         	"maintainer": true
         }
 	],
@@ -19,7 +19,7 @@
 		"type": "git", 
 		"url": "https://github.com/kolod/Arduino-Simple-Modbus-Slave.git"
 	},
-	"version": "1.0.2",
+	"version": "1.1.0",
 	"license": "ISC",
 	"frameworks": "arduino",
 	"platforms": "*",

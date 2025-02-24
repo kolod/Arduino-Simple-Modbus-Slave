@@ -9,15 +9,6 @@
  *
  */
 
-#include <inttypes.h>
-
-#if defined(ARDUINO) && ARDUINO >= 100
-#include "Arduino.h"
-#else
-#include "WProgram.h"
-#include <pins_arduino.h>
-#endif
-
 #include "SimpleModbusSlave.h"
 
 #define _MODBUS_RTU_SLAVE                0
@@ -31,8 +22,17 @@
 #define _MODBUSINO_RTU_MAX_ADU_LENGTH 256
 
 // Supported function codes
-#define _FC_READ_HOLDING_REGISTERS    0x03
-#define _FC_WRITE_MULTIPLE_REGISTERS  0x10
+#define _FC_READ_COILS                      0x01
+#define _FC_READ_DISCRETE_INPUTS            0x02
+#define _FC_READ_HOLDING_REGISTERS          0x03
+#define _FC_READ_INPUT_REGISTERS            0x04
+#define _FC_WRITE_SINGLE_COIL               0x05
+#define _FC_WRITE_SINGLE_REGISTER           0x06
+#define _FC_WRITE_MULTIPLE_REGISTERS        0x10
+#define _FC_READ_FILE_RECORD                0x14
+#define _FC_WRITE_FILE_RECORD               0x15
+#define _FC_MASK_WRITE_REGISTER             0x16
+#define _FC_READ_WRITE_HOLDING_REGISTERS    0x17
 
 enum {
 	_STEP_FUNCTION = 0x01,
@@ -188,37 +188,78 @@ static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_
 	uint8_t  rsp[_MODBUSINO_RTU_MAX_ADU_LENGTH];
 	uint8_t  rsp_length = 0;
 
-	if (slave != _slave && slave != MODBUS_BROADCAST_ADDRESS) return;
+	if ((slave != _slave) && (slave != MODBUS_BROADCAST_ADDRESS)) return;
 
 	if ((address + nb) > nb_reg) {
 		rsp_length = response_exception(slave, function, MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS, rsp);
-	} else {
-		req_length -= _MODBUS_RTU_CHECKSUM_LENGTH;
-
-		if (function == _FC_READ_HOLDING_REGISTERS) {
-			uint16_t i;
-
-			rsp_length = build_response_basis(slave, function, rsp);
-			rsp[rsp_length++] = nb << 1;
-			for (i = address; i < address + nb; i++) {
-			    rsp[rsp_length++] = tab_reg[i] >> 8;
-				rsp[rsp_length++] = tab_reg[i] & 0xFF;
-			}
-		} else {
-			uint16_t i, j;
-
-			for (i = address, j = 6; i < address + nb; i++, j += 2) {
-				/* 6 and 7 = first value */
-				tab_reg[i] = (req[_MODBUS_RTU_FUNCTION + j] << 8) + req[_MODBUS_RTU_FUNCTION + j + 1];
-			}
-
-			rsp_length = build_response_basis(slave, function, rsp);
-			/* 4 to copy the address (2) and the no. of registers */
-			memcpy(rsp + rsp_length, req + rsp_length, 4);
-			rsp_length += 4;
+		goto send_response;
+	} 
+	
+	req_length -= _MODBUS_RTU_CHECKSUM_LENGTH;
+	
+	if (function == _FC_READ_HOLDING_REGISTERS) {
+		rsp_length = build_response_basis(slave, function, rsp);
+		rsp[rsp_length++] = nb << 1;
+		for (uint16_t i = address; i < address + nb; i++) {
+		    rsp[rsp_length++] = tab_reg[i] >> 8;
+			rsp[rsp_length++] = tab_reg[i] & 0xFF;
 		}
+		
+		goto send_response;
+	} 
+
+	if (function == _FC_WRITE_SINGLE_REGISTER) {
+		tab_reg[address] = (req[_MODBUS_RTU_FUNCTION + 3] << 8) + req[_MODBUS_RTU_FUNCTION + 4];
+		rsp_length = build_response_basis(slave, function, rsp);
+		memcpy(rsp + rsp_length, req + rsp_length, 4);
+		rsp_length += 4;
+		
+		goto send_response;
+	}
+		
+	if (function == _FC_WRITE_MULTIPLE_REGISTERS) {
+		for (uint16_t i = address, uint16_t j = 6; i < address + nb; i++, j += 2) {
+			/* 6 and 7 = first value */
+			tab_reg[i] = (req[_MODBUS_RTU_FUNCTION + j] << 8) + req[_MODBUS_RTU_FUNCTION + j + 1];
+		}
+
+		rsp_length = build_response_basis(slave, function, rsp);
+		/* 4 to copy the address (2) and the no. of registers */
+		memcpy(rsp + rsp_length, req + rsp_length, 4);
+		rsp_length += 4;
+		
+		goto send_response;
+	} 
+	
+	if (function == _FC_READ_WRITE_HOLDING_REGISTERS) {
+		uint16_t address_read = (req[_MODBUS_RTU_FUNCTION + 1] << 8) + req[_MODBUS_RTU_FUNCTION + 2];
+		uint16_t nb_read = (req[_MODBUS_RTU_FUNCTION + 3] << 8) + req[_MODBUS_RTU_FUNCTION + 4];
+		uint16_t address_write = (req[_MODBUS_RTU_FUNCTION + 5] << 8) + req[_MODBUS_RTU_FUNCTION + 6];
+		uint16_t nb_write = (req[_MODBUS_RTU_FUNCTION + 7] << 8) + req[_MODBUS_RTU_FUNCTION + 8];
+
+		if ((address_read + nb_read) > nb_reg || (address_write + nb_write) > nb_reg) {
+			rsp_length = response_exception(slave, function, MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS, rsp);
+			goto send_response;
+		}
+
+		rsp_length = build_response_basis(slave, function, rsp);
+		rsp[rsp_length++] = nb_read << 1;
+		for (uint16_t i = address_read; i < address_read + nb_read; i++) {
+			rsp[rsp_length++] = tab_reg[i] >> 8;
+			rsp[rsp_length++] = tab_reg[i] & 0xFF;
+		}
+
+		for (uint16_t i = address_write, uint16_t j = 9; i < address_write + nb_write; i++, j += 2) {
+			tab_reg[i] = (req[_MODBUS_RTU_FUNCTION + j] << 8) + req[_MODBUS_RTU_FUNCTION + j + 1];
+		}
+
+		goto send_response;
 	}
 
+	// Unsupported function
+	rsp_length = response_exception(slave, function, MODBUS_EXCEPTION_ILLEGAL_FUNCTION, rsp);
+
+send_response:
 	send_msg(rsp, rsp_length);
 }
 
