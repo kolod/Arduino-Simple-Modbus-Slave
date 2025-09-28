@@ -40,18 +40,26 @@ enum {
 	_STEP_DATA
 };
 
-SimpleModbusSlave::SimpleModbusSlave(uint8_t slave) {
-	if ((slave >= 0) & (slave <= 247)) {
-		_slave = slave;
+SimpleModbusSlave::SimpleModbusSlave(uint8_t slave, uint8_t dir_pin) {
+	// Validate slave ID range (1-247 for Modbus)
+	if (slave == 0 || slave > 247) {
+		// Handle invalid slave ID - you might want to set a default or handle differently
+		slave = 1; // Default to slave ID 1
 	}
+	_slave = slave;
+	_dir_pin = dir_pin;
 }
 
 void SimpleModbusSlave::setup(long baud) {
 	Serial.begin(baud);
+	if (_dir_pin != 0xFF) {
+		pinMode(_dir_pin, OUTPUT);
+		digitalWrite(_dir_pin, LOW);
+	}
 }
 
 // Check CRC of msg
-static int check_integrity(uint8_t *msg, uint8_t msg_length) {
+int SimpleModbusSlave::check_integrity(uint8_t *msg, uint8_t msg_length) {
 	if ((msg_length >= 2) && crc16(msg, msg_length) == 0) {
 		return msg_length;
 	} else {
@@ -59,19 +67,22 @@ static int check_integrity(uint8_t *msg, uint8_t msg_length) {
 	}
 }
 
-static int build_response_basis(uint8_t slave, uint8_t function, uint8_t* rsp) {
-	rsp[0] = slave;
+int SimpleModbusSlave::build_response_basis(uint8_t function, uint8_t* rsp) {
+	rsp[0] = _slave;
 	rsp[1] = function;
 	return _MODBUS_RTU_PRESET_RSP_LENGTH;
 }
 
-static void send_msg(uint8_t *msg, uint8_t msg_length) {
+void SimpleModbusSlave::send_msg(uint8_t *msg, uint8_t msg_length) {
 	add_crc16(msg, msg_length);
+	if (_dir_pin != 0xFF) digitalWrite(_dir_pin, HIGH);
 	Serial.write(msg, msg_length + 2);
+	Serial.flush();
+	if (_dir_pin != 0xFF) digitalWrite(_dir_pin, LOW);
 }
 
-static uint8_t response_exception(uint8_t slave, uint8_t function, uint8_t exception_code, uint8_t *rsp) {
-	uint8_t rsp_length = build_response_basis(slave, function + 0x80, rsp);
+uint8_t SimpleModbusSlave::response_exception(uint8_t function, uint8_t exception_code, uint8_t *rsp) {
+	uint8_t rsp_length = build_response_basis(function + 0x80, rsp);
 
 	// Positive exception code
 	rsp[rsp_length++] = exception_code;
@@ -79,7 +90,7 @@ static uint8_t response_exception(uint8_t slave, uint8_t function, uint8_t excep
 	return rsp_length;
 }
 
-static void flush(void) {
+void SimpleModbusSlave::flush(void) {
 	uint8_t i = 0;
 
 	// Wait a moment to receive the remaining garbage but avoid getting stuck
@@ -90,7 +101,7 @@ static void flush(void) {
 	}
 }
 
-static int receive(uint8_t *req, uint8_t _slave) {
+int SimpleModbusSlave::receive(uint8_t *req) {
 	uint8_t i;
 	uint8_t length_to_read;
 	uint8_t req_index;
@@ -127,7 +138,7 @@ static int receive(uint8_t *req, uint8_t _slave) {
 
 		if (length_to_read == 0) {
 
-			if (req[_MODBUS_RTU_SLAVE] != _slave && req[_MODBUS_RTU_SLAVE != MODBUS_BROADCAST_ADDRESS]) {
+			if (req[_MODBUS_RTU_SLAVE] != _slave && req[_MODBUS_RTU_SLAVE] != MODBUS_BROADCAST_ADDRESS) {
 				flush();
 				return -1 - MODBUS_INFORMATIVE_NOT_FOR_US;
 			}
@@ -145,7 +156,7 @@ static int receive(uint8_t *req, uint8_t _slave) {
 					flush();
 					if (req[_MODBUS_RTU_SLAVE] == _slave || req[_MODBUS_RTU_SLAVE] == MODBUS_BROADCAST_ADDRESS) {
 						// It's for me so send an exception (reuse req)
-						uint8_t rsp_length = response_exception(_slave, function, MODBUS_EXCEPTION_ILLEGAL_FUNCTION, req);
+						uint8_t rsp_length = response_exception(function, MODBUS_EXCEPTION_ILLEGAL_FUNCTION, req);
 						send_msg(req, rsp_length);
 						return - 1 - MODBUS_EXCEPTION_ILLEGAL_FUNCTION;
 					}
@@ -166,7 +177,7 @@ static int receive(uint8_t *req, uint8_t _slave) {
 					flush();
 					if (req[_MODBUS_RTU_SLAVE] == _slave || req[_MODBUS_RTU_SLAVE] == MODBUS_BROADCAST_ADDRESS) {
 						// It's for me so send an exception (reuse req)
-						uint8_t rsp_length = response_exception(_slave, function, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE, req);
+						uint8_t rsp_length = response_exception(function, MODBUS_EXCEPTION_ILLEGAL_DATA_VALUE, req);
 						send_msg(req, rsp_length);
 						return - 1 - MODBUS_EXCEPTION_ILLEGAL_FUNCTION;
 					}
@@ -180,7 +191,7 @@ static int receive(uint8_t *req, uint8_t _slave) {
 	return check_integrity(req, req_index);
 }
 
-static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_length, uint8_t _slave) {
+void SimpleModbusSlave::reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_length) {
 	uint8_t  slave    = req[_MODBUS_RTU_SLAVE];
 	uint8_t  function = req[_MODBUS_RTU_FUNCTION];
 	uint16_t address  = (req[_MODBUS_RTU_FUNCTION + 1] << 8) + req[_MODBUS_RTU_FUNCTION + 2];
@@ -191,14 +202,14 @@ static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_
 	if (slave != _slave && slave != MODBUS_BROADCAST_ADDRESS) return;
 
 	if ((address + nb) > nb_reg) {
-		rsp_length = response_exception(slave, function, MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS, rsp);
+		rsp_length = response_exception(function, MODBUS_EXCEPTION_ILLEGAL_DATA_ADDRESS, rsp);
 	} else {
 		req_length -= _MODBUS_RTU_CHECKSUM_LENGTH;
 
 		if (function == _FC_READ_HOLDING_REGISTERS) {
 			uint16_t i;
 
-			rsp_length = build_response_basis(slave, function, rsp);
+			rsp_length = build_response_basis(function, rsp);
 			rsp[rsp_length++] = nb << 1;
 			for (i = address; i < address + nb; i++) {
 			    rsp[rsp_length++] = tab_reg[i] >> 8;
@@ -212,7 +223,7 @@ static void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_
 				tab_reg[i] = (req[_MODBUS_RTU_FUNCTION + j] << 8) + req[_MODBUS_RTU_FUNCTION + j + 1];
 			}
 
-			rsp_length = build_response_basis(slave, function, rsp);
+			rsp_length = build_response_basis(function, rsp);
 			/* 4 to copy the address (2) and the no. of registers */
 			memcpy(rsp + rsp_length, req + rsp_length, 4);
 			rsp_length += 4;
@@ -227,9 +238,9 @@ int SimpleModbusSlave::loop(uint16_t* tab_reg, uint16_t nb_reg) {
 	uint8_t req[_MODBUSINO_RTU_MAX_ADU_LENGTH];
 
 	if (Serial.available()) {
-		rc = receive(req, _slave);
+		rc = receive(req);
 		if (rc > 0) {
-			reply(tab_reg, nb_reg, req, rc, _slave);
+			reply(tab_reg, nb_reg, req, rc);
 		}
 	}
 

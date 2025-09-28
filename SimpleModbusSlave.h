@@ -33,11 +33,20 @@
 
 class SimpleModbusSlave {
 public:
-    SimpleModbusSlave(uint8_t slave);
+    SimpleModbusSlave(uint8_t slave, uint8_t dir_pin = 0xFF);
     void setup(long baud);
     int loop(uint16_t *tab_reg, uint16_t nb_reg);
 private:
-    int _slave;
+    uint8_t _slave;
+    uint8_t _dir_pin;
+    
+    int receive(uint8_t *req);
+    void reply(uint16_t *tab_reg, uint16_t nb_reg, uint8_t *req, uint8_t req_length);
+    int check_integrity(uint8_t *msg, uint8_t msg_length);
+    int build_response_basis(uint8_t function, uint8_t* rsp);
+    void send_msg(uint8_t *msg, uint8_t msg_length);
+    uint8_t response_exception(uint8_t function, uint8_t exception_code, uint8_t *rsp);
+    void flush(void);
 };
 
 #endif /* SimpleModbusSlave_h */
