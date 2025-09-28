@@ -389,19 +389,8 @@ jobs:
         fi
         
         # Validate library.json structure
-        python -c "
-import json
-with open('library.json', 'r') as f:
-    lib_data = json.load(f)
-    
-required_fields = ['name', 'version', 'description', 'keywords', 'authors']
-for field in required_fields:
-    if field not in lib_data:
-        print(f'ERROR: Required field {field} missing from library.json')
-        exit(1)
-        
-print('✅ library.json validation passed')
-"
+        echo "Validating library.json structure..."
+        python3 -c "import json; data=json.load(open('library.json')); fields=['name','version','description','keywords','authors']; missing=[f for f in fields if f not in data]; exit(1) if missing else print('✅ library.json validation passed')"
 
     - name: Publish to PlatformIO Registry
       if: steps.version-check.outputs.should_publish == 'true'
