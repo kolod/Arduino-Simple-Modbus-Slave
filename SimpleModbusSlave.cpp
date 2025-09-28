@@ -40,13 +40,13 @@ enum {
 	_STEP_DATA
 };
 
-SimpleModbusSlave::SimpleModbusSlave(uint8_t slave, uint8_t dir_pin) {
-    static_assert(slave > 0 && slave <= 247, "Slave ID must be in range 1-247");
-	_slave = slave;
+SimpleModbusSlave::SimpleModbusSlave(const uint8_t slave, const uint8_t dir_pin) {
+	// Validate slave ID range (1-247 for Modbus) at runtime
+	_slave = (slave > 0 && slave <= 247) ? slave : 1; // Default to 1 if invalid
 	_dir_pin = dir_pin;
 }
 
-void SimpleModbusSlave::setup(long baud) {
+void SimpleModbusSlave::setup(const long baud) {
 	Serial.begin(baud);
 	if (_dir_pin != 0xFF) {
 		pinMode(_dir_pin, OUTPUT);
@@ -55,7 +55,7 @@ void SimpleModbusSlave::setup(long baud) {
 }
 
 // Check CRC of msg
-int SimpleModbusSlave::check_integrity(uint8_t *msg, uint8_t msg_length) {
+int SimpleModbusSlave::check_integrity(uint8_t *msg, const uint8_t msg_length) {
 	if ((msg_length >= 2) && crc16(msg, msg_length) == 0) {
 		return msg_length;
 	} else {
@@ -63,13 +63,13 @@ int SimpleModbusSlave::check_integrity(uint8_t *msg, uint8_t msg_length) {
 	}
 }
 
-int SimpleModbusSlave::build_response_basis(uint8_t function, uint8_t* rsp) {
+int SimpleModbusSlave::build_response_basis(const uint8_t function, uint8_t* rsp) {
 	rsp[0] = _slave;
 	rsp[1] = function;
 	return _MODBUS_RTU_PRESET_RSP_LENGTH;
 }
 
-void SimpleModbusSlave::send_msg(uint8_t *msg, uint8_t msg_length) {
+void SimpleModbusSlave::send_msg(uint8_t *msg, const uint8_t msg_length) {
 	add_crc16(msg, msg_length);
 	if (_dir_pin != 0xFF) digitalWrite(_dir_pin, HIGH);
 	Serial.write(msg, msg_length + 2);
@@ -77,7 +77,7 @@ void SimpleModbusSlave::send_msg(uint8_t *msg, uint8_t msg_length) {
 	if (_dir_pin != 0xFF) digitalWrite(_dir_pin, LOW);
 }
 
-uint8_t SimpleModbusSlave::response_exception(uint8_t function, uint8_t exception_code, uint8_t *rsp) {
+uint8_t SimpleModbusSlave::response_exception(const uint8_t function, const uint8_t exception_code, uint8_t *rsp) {
 	uint8_t rsp_length = build_response_basis(function + 0x80, rsp);
 
 	// Positive exception code
