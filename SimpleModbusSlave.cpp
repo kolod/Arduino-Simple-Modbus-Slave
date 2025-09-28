@@ -41,11 +41,7 @@ enum {
 };
 
 SimpleModbusSlave::SimpleModbusSlave(uint8_t slave, uint8_t dir_pin) {
-	// Validate slave ID range (1-247 for Modbus)
-	if (slave == 0 || slave > 247) {
-		// Handle invalid slave ID - you might want to set a default or handle differently
-		slave = 1; // Default to slave ID 1
-	}
+    static_assert(slave > 0 && slave <= 247, "Slave ID must be in range 1-247");
 	_slave = slave;
 	_dir_pin = dir_pin;
 }
