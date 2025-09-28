@@ -21,18 +21,22 @@ static uint8_t msg[] = {0x01, 0x03, 0x02, 0x00, 0x10, 0xff, 0x1e};
 bool test(uint8_t *data, uint8_t length) {
 	add_crc16(data, length - 2);
 	uint16_t crc = crc16(data, length);
-	printf("CRC = 0x%02X%02X\n", data[length-2], data[length-1]);
-	printf("CRC = 0x%04X\n", crc);
+	Serial.print("CRC = 0x");
+	Serial.print(data[length-2], HEX);
+	Serial.print(data[length-1], HEX);
+	Serial.println();
+	Serial.print("CRC = 0x");
+	Serial.println(crc, HEX);
 	return crc == 0;
 }
 
-int setup() {
+void setup() {
   Serial.begin(115200);
   
 	if (test(msg, sizeof(msg))) {
-		Serial.print("CRC16 Ok!\n");
+		Serial.println("CRC16 Ok!");
 	} else {
-		Serial.print("CRC16 Fail!\n");
+		Serial.println("CRC16 Fail!");
 	}
 }
 
