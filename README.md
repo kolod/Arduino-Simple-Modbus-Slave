@@ -1,7 +1,11 @@
 [![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-direct.svg)](https://vshymanskyy.github.io/StandWithUkraine/)
 
-Simple Modbus Slave
-=========
+# Simple Modbus Slave
+
+[![Test Library](https://github.com/kolod/Arduino-Simple-Modbus-Slave/actions/workflows/test.yml/badge.svg)](https://github.com/kolod/Arduino-Simple-Modbus-Slave/actions/workflows/test.yml)
+[![PlatformIO Registry](https://badges.registry.platformio.org/packages/kolod/library/SimpleModbusSlave.svg)](https://registry.platformio.org/libraries/kolod/SimpleModbusSlave)
+[![GitHub release](https://img.shields.io/github/release/kolod/Arduino-Simple-Modbus-Slave.svg)](https://github.com/kolod/Arduino-Simple-Modbus-Slave/releases)
+[![License](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
 
 Introduction
 ------------
@@ -9,7 +13,7 @@ Introduction
 Arduino Simple Modbus Slave is an ISC licensed library to handle Modbus requests on Arduino (slave).
 
 
-Features
+## Features
 --------
 
 To keep it simple and to reduce memory consumption, only the two following

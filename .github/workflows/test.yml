@@ -323,3 +323,172 @@ jobs:
         echo "- ✅ Documentation checks passed" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "Library is ready for release! 🚀" >> $GITHUB_STEP_SUMMARY
+
+  publish-platformio:
+    name: Publish to PlatformIO Registry
+    runs-on: ubuntu-latest
+    needs: [arduino-cli, platformio, unit-tests, library-validation, documentation, release-check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for version comparison
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install platformio
+
+    - name: Check if version is newer than published
+      id: version-check
+      run: |
+        # Get current version from library.json
+        CURRENT_VERSION=$(grep '"version":' library.json | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+        echo "Current version: $CURRENT_VERSION"
+        
+        # Try to get published version (this will fail if library is not published yet)
+        PUBLISHED_VERSION=""
+        if pio lib show "SimpleModbusSlave" > /dev/null 2>&1; then
+          PUBLISHED_VERSION=$(pio lib show "SimpleModbusSlave" | grep "Version:" | awk '{print $2}' | head -1)
+          echo "Published version: $PUBLISHED_VERSION"
+        else
+          echo "Library not yet published to PlatformIO Registry"
+          PUBLISHED_VERSION="0.0.0"
+        fi
+        
+        # Compare versions using sort -V (version sort)
+        if printf '%s\n%s\n' "$PUBLISHED_VERSION" "$CURRENT_VERSION" | sort -V -C; then
+          if [ "$CURRENT_VERSION" != "$PUBLISHED_VERSION" ]; then
+            echo "✅ Current version ($CURRENT_VERSION) is newer than published ($PUBLISHED_VERSION)"
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+            echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+            echo "published_version=$PUBLISHED_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Current version ($CURRENT_VERSION) is same as published ($PUBLISHED_VERSION)"
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "❌ Current version ($CURRENT_VERSION) is older than published ($PUBLISHED_VERSION)"
+          echo "should_publish=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Validate library for publishing
+      if: steps.version-check.outputs.should_publish == 'true'
+      run: |
+        # Check that required files exist
+        if [ ! -f "library.json" ]; then
+          echo "ERROR: library.json not found"
+          exit 1
+        fi
+        
+        # Validate library.json structure
+        python -c "
+import json
+with open('library.json', 'r') as f:
+    lib_data = json.load(f)
+    
+required_fields = ['name', 'version', 'description', 'keywords', 'authors']
+for field in required_fields:
+    if field not in lib_data:
+        print(f'ERROR: Required field {field} missing from library.json')
+        exit(1)
+        
+print('✅ library.json validation passed')
+"
+
+    - name: Publish to PlatformIO Registry
+      if: steps.version-check.outputs.should_publish == 'true'
+      env:
+        PLATFORMIO_AUTH_TOKEN: ${{ secrets.PLATFORMIO_AUTH_TOKEN }}
+      run: |
+        echo "Publishing SimpleModbusSlave v${{ steps.version-check.outputs.current_version }} to PlatformIO Registry..."
+        
+        if [ -z "$PLATFORMIO_AUTH_TOKEN" ]; then
+          echo "❌ PLATFORMIO_AUTH_TOKEN secret not found!"
+          echo "Please add your PlatformIO account token to GitHub repository secrets"
+          echo "Get your token from: https://registry.platformio.org/token"
+          exit 1
+        fi
+        
+        # Publish the library
+        pio package publish --type=library
+        
+        echo "✅ Successfully published to PlatformIO Registry!"
+
+    - name: Create GitHub Release
+      if: steps.version-check.outputs.should_publish == 'true'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.version-check.outputs.current_version }}
+        release_name: Release v${{ steps.version-check.outputs.current_version }}
+        body: |
+          ## SimpleModbusSlave v${{ steps.version-check.outputs.current_version }}
+          
+          ### 🚀 What's New
+          - Automatic release from main branch
+          - All tests passed ✅
+          - Published to PlatformIO Registry
+          
+          ### 📦 Installation
+          
+          **PlatformIO:**
+          ```bash
+          pio lib install "SimpleModbusSlave@${{ steps.version-check.outputs.current_version }}"
+          ```
+          
+          **Arduino IDE:**
+          Use Library Manager or download from GitHub releases.
+          
+          ### 🔗 Links
+          - [PlatformIO Registry](https://registry.platformio.org/libraries/kolod/SimpleModbusSlave)
+          - [GitHub Repository](https://github.com/kolod/Arduino-Simple-Modbus-Slave)
+          
+          ---
+          *This release was automatically created by GitHub Actions*
+        draft: false
+        prerelease: false
+
+    - name: Update release summary
+      if: steps.version-check.outputs.should_publish == 'true'
+      run: |
+        echo "## 🎉 Library Published Successfully!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Version Information" >> $GITHUB_STEP_SUMMARY
+        echo "- **Published Version:** v${{ steps.version-check.outputs.current_version }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Previous Version:** v${{ steps.version-check.outputs.published_version }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 Installation Commands" >> $GITHUB_STEP_SUMMARY
+        echo '```bash' >> $GITHUB_STEP_SUMMARY
+        echo "# PlatformIO" >> $GITHUB_STEP_SUMMARY
+        echo "pio lib install \"SimpleModbusSlave@${{ steps.version-check.outputs.current_version }}\"" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "# Arduino CLI" >> $GITHUB_STEP_SUMMARY
+        echo "arduino-cli lib install \"SimpleModbusSlave@${{ steps.version-check.outputs.current_version }}\"" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔗 Registry Links" >> $GITHUB_STEP_SUMMARY
+        echo "- [PlatformIO Registry](https://registry.platformio.org/libraries/kolod/SimpleModbusSlave)" >> $GITHUB_STEP_SUMMARY
+        echo "- [Arduino Library Manager](https://www.arduinolibraries.info/libraries/simple-modbus-slave)" >> $GITHUB_STEP_SUMMARY
+
+    - name: Skip publishing summary
+      if: steps.version-check.outputs.should_publish == 'false'
+      run: |
+        echo "## ℹ️ Publishing Skipped" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Reason:** Version not newer than published version" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Current Version:** v${{ steps.version-check.outputs.current_version || 'unknown' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Published Version:** v${{ steps.version-check.outputs.published_version || 'unknown' }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "To publish a new version:" >> $GITHUB_STEP_SUMMARY
+        echo "1. Update version in \`library.json\` and \`library.properties\`" >> $GITHUB_STEP_SUMMARY
+        echo "2. Commit and push to main branch" >> $GITHUB_STEP_SUMMARY
